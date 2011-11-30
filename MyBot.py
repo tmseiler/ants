@@ -171,7 +171,6 @@ class MyBot:
             self._goalmaps[goal][t] = MAX/2
         log.debug('Time left after marking goals: %s', ants.time_remaining())
 
-        
         for goal in to_diffuse:
             for i in range(goal_diffusions[goal]):
                 self.diffuse(goal=goal)
