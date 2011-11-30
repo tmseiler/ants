@@ -11,7 +11,7 @@ goals = ['food', 'explore', 'enemy_hill']
 goal_weights = {
     'food': .05,
     'explore': .04,
-    'enemy_hill': .1
+    'enemy_hill': .05
 }
 
 goal_diffusions = {
@@ -84,14 +84,14 @@ class MyBot:
     def diffuse(self, goal):
         gm = self._goalmaps[goal]
         d = goal_weights[goal]
-        l = self._basecollab.copy()
-        if goal == 'food':
-            l *= MyBot.fear_of(self._myants)
+#        l = self._basecollab.copy()
+#        if goal == 'food':
+#            l *= MyBot.fear_of(self._myants)
             #log.debug(l)
-        gm += d * MyBot.fastroll(gm, shift=1, axis=1) * self._watermap * l
-        gm += d * MyBot.fastroll(gm, shift=-1, axis=1) * self._watermap * l
-        gm += d * MyBot.fastroll(gm, shift=1, axis=0) * self._watermap * l
-        gm += d * MyBot.fastroll(gm, shift=-1, axis=0) * self._watermap * l
+        gm += d * MyBot.fastroll(gm, shift=1, axis=1) * self._watermap
+        gm += d * MyBot.fastroll(gm, shift=-1, axis=1) * self._watermap
+        gm += d * MyBot.fastroll(gm, shift=1, axis=0) * self._watermap
+        gm += d * MyBot.fastroll(gm, shift=-1, axis=0) * self._watermap
         self._goalmaps[goal] = gm
 
     def dump_diffuse_map(self, goal):
@@ -119,14 +119,14 @@ class MyBot:
     def move_to_goal(self, (r, c), goal):
         neighbors = self._ants.neighbours((r, c))
         gm = self._goalmaps[goal]
-        food_vals = [(gm[nr, nc], nr, nc) for nr, nc in neighbors]
-        food_vals.sort()
-        food_vals.reverse()
-        for v in food_vals:
-            dest, food_val = (v[1], v[2]), v[0]
+        goal_vals = [(gm[nr, nc], nr, nc) for nr, nc in neighbors]
+        goal_vals.sort()
+        goal_vals.reverse()
+        for v in goal_vals:
+            dest, goal_val = (v[1], v[2]), v[0]
             self.sought[goal] += 1
 #            log.debug('Ant (seeking %s) (%s, %s) -> (%s) %s %s' %
-#                      (goal, r, c, food_val, dest[0], dest[1]))
+#                      (goal, r, c, goal_val, dest[0], dest[1]))
             if dest not in self._targets:
                 self._ants.issue_order((r, c), dest)
                 self._targets[dest] = (r, c)
@@ -159,12 +159,9 @@ class MyBot:
         for eh in self._ants.enemy_hills():
             if eh not in self.enemy_hills:
                 self.enemy_hills.append(eh)
-                self._goalmaps['enemy_hill'] *= 0
                 if 'enemy_hill' not in to_diffuse:
                     to_diffuse.append('enemy_hill')
-            self._goalmaps['enemy_hill'][eh[0]] = MAX
         log.debug('Time left after mapping hills: %s', ants.time_remaining())
-
 
         for goal in ['food', 'explore']:
             t = ants.map == map_vals[goal]
@@ -172,6 +169,10 @@ class MyBot:
         log.debug('Time left after marking goals: %s', ants.time_remaining())
 
         for goal in to_diffuse:
+            if goal == 'enemy_hill':
+                self._goalmaps['enemy_hill'] *= 0
+                for eh in self.enemy_hills:
+                    self._goalmaps['enemy_hill'][eh[0]] = MAX/2
             for i in range(goal_diffusions[goal]):
                 self.diffuse(goal=goal)
         log.debug('Time left after diffusing: %s', ants.time_remaining())
