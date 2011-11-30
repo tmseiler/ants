@@ -11,7 +11,7 @@ goals = ['food', 'explore', 'enemy_hill']
 goal_weights = {
     'food': .05,
     'explore': .04,
-    'enemy_hill': .08
+    'enemy_hill': .1
 }
 
 goal_diffusions = {
@@ -52,17 +52,11 @@ class MyBot:
         self._myants = np.empty((ants.rows, ants.cols), bool)
         self._enemyants = np.empty((ants.rows, ants.cols), bool)
 
-        goal_diffusions['food'] = int(max(ants.rows, ants.cols) * .2)
-        goal_diffusions['explore'] = int(max(ants.rows, ants.cols) * .05)
-        goal_diffusions['enemy_hill'] = int(max(ants.rows, ants.cols) * .05)
+        goal_diffusions['food'] = int(max(ants.rows, ants.cols) * .3)
+        goal_diffusions['explore'] = int(max(ants.rows, ants.cols) * .8)
+        goal_diffusions['enemy_hill'] = int(max(ants.rows, ants.cols) * .8)
 
         self._basecollab = np.ones((self.ants.rows, self.ants.cols))
-
-    def mark_hills(self, ants, (r, c)):
-        gm = self._goalmaps['enemy_hill']
-        if (r, c) in ants.enemy_hills():
-            self.enemy_hills.append((r, c))
-            gm[r, c] = MAX/2
 
     @staticmethod
     def fear_of(arr):
@@ -108,14 +102,12 @@ class MyBot:
                 val = gm[r, c]
                 o = ''
                 if self._ants.map[r, c] == WATER:
-                    o = 'W'
+                    o = '~'
                 elif (r, c) in self._ants.my_ants():
                     o = '@'
-                elif val == MAX:
-                    o = '#'
-                elif val > .2 * MAX:
-                    o = '+'
-                elif val > .0005 * MAX:
+                elif val > 1000 * MAX:
+                    o = '%'
+                elif val > .1 * MAX:
                     o = ':'
                 elif val > 0:
                     o = '.'
@@ -149,9 +141,13 @@ class MyBot:
         self._enemyants *= False
         self._myants *= False
         decisions = {}
+        to_diffuse = ['food', 'explore']
 
-        for goal in ['food']:
+        for goal in ['food', 'explore']:
             self._goalmaps[goal] *= 0
+
+        t = ants.map == -4
+        self._watermap[t] = 0
 
         for ant in ants.ant_list:
             if ant in ants.my_ants():
@@ -163,34 +159,25 @@ class MyBot:
         for eh in self._ants.enemy_hills():
             if eh not in self.enemy_hills:
                 self.enemy_hills.append(eh)
-        log.debug('Time left after marking hills: %s', ants.time_remaining())
-
-        for eh in self.enemy_hills:
-            log.debug('Adding (%s, %s) to enemy hill map' % eh)
-            r, c = eh[0][0], eh[0][1]
-            self._goalmaps['enemy_hill'][r, c] = MAX
+                self._goalmaps['enemy_hill'] *= 0
+                if 'enemy_hill' not in to_diffuse:
+                    to_diffuse.append('enemy_hill')
+            self._goalmaps['enemy_hill'][eh[0]] = MAX
         log.debug('Time left after mapping hills: %s', ants.time_remaining())
 
-        t = ants.map == -4
-        self._watermap[t] = 0
 
         for goal in ['food', 'explore']:
             t = ants.map == map_vals[goal]
             self._goalmaps[goal][t] = MAX/2
-        for r in range(ants.rows):
-            for c in range(ants.cols):
-                self.mark_hills(ants, (r, c))
         log.debug('Time left after marking goals: %s', ants.time_remaining())
+
         
-        for goal in goals:
+        for goal in to_diffuse:
             for i in range(goal_diffusions[goal]):
                 self.diffuse(goal=goal)
-        self._goalmaps['enemy_hill'] /= 4
-        self._goalmaps['explore'] /= 4
         log.debug('Time left after diffusing: %s', ants.time_remaining())
 
         for r, c in ants.my_ants():
-            #target_goal = None
             if self._goalmaps['food'][r, c] > 0:
                 target_goal = 'food'
             elif self._goalmaps['enemy_hill'][r, c] > 0:
@@ -212,7 +199,7 @@ class MyBot:
                 self.sought['nothing'] += 1
         log.debug('Time left after moving ants: %s', ants.time_remaining())
 
-        #self.dump_diffuse_map('food')
+        #self.dump_diffuse_map('enemy_hill')
         log.debug(self.sought)
         log.debug('my ants: %s enemy hills: %s', len(ants.my_ants()), self.enemy_hills)
         log.debug('Turn took %sms.', start_time - ants.time_remaining())
